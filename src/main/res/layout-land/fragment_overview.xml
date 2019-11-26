@@ -86,7 +86,7 @@
             android:text="@string/total"/>
     </LinearLayout>
 
-    <org.eazegraph.lib.charts.BarChart
+    <de.j4velin.pedometer.ui.stats.StepChart
         xmlns:eaze="http://schemas.android.com/apk/res-auto"
         android:id="@+id/bargraph"
         android:layout_width="match_parent"

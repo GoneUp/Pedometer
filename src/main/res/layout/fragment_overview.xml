@@ -3,7 +3,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:padding="5dp"
-                tools:context=".Activity_Main">
+                tools:context=".ui.Activity_Main">
 
     <org.eazegraph.lib.charts.PieChart
         xmlns:eaze="http://schemas.android.com/apk/res-auto"
@@ -19,7 +19,7 @@
         android:id="@+id/steps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="75dp"
+        android:layout_marginTop="60dp"
         android:gravity="center"
         android:textSize="45sp"
         android:text="10.000"/>
@@ -81,14 +81,74 @@
             android:text="@string/total"/>
     </LinearLayout>
 
-    <org.eazegraph.lib.charts.BarChart
-        xmlns:eaze="http://schemas.android.com/apk/res-auto"
-        android:id="@+id/bargraph"
+
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="150dp"
-        android:layout_below="@+id/averageandtotaltext"
-        android:layout_marginTop="50dp"
-        eaze:egLegendHeight="35dp"
-        eaze:egShowValues="true"/>
+        android:layout_height="match_parent"
+        android:layout_alignParentBottom="true"
+        android:orientation="vertical"
+        android:layout_below="@+id/averageandtotaltext">
+
+        <!--
+        <TextView
+            android:id="@+id/dateText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="01.01.2019 - 07.01.2019"
+
+            android:textSize="12sp" />
+
+            -->
+
+        <android.support.v4.view.ViewPager xmlns:eaze="http://schemas.android.com/apk/res-auto"
+            android:id="@+id/chartPager"
+            android:layout_width="match_parent"
+            android:layout_height="0px"
+            android:layout_weight="1"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="1dp" />
+
+
+        <RadioGroup
+            android:id="@+id/resolutionGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/btn_day"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/resolution_day" />
+
+            <RadioButton
+                android:id="@+id/btn_week"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/resolution_week" />
+
+            <RadioButton
+                android:id="@+id/btn_month"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/resolution_month" />
+
+            <RadioButton
+                android:id="@+id/btn_year"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/resolution_year" />
+
+            <Spinner
+                android:id="@+id/box_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:entries="@array/mode_array" />
+        </RadioGroup>
+    </LinearLayout>
 
 </RelativeLayout>

@@ -18,15 +18,15 @@ package de.j4velin.pedometer.ui;
 
 import android.Manifest;
 import android.app.AlertDialog;
-import android.app.Fragment;
-import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.PermissionChecker;
 import android.text.method.LinkMovementMethod;
 import android.view.MenuItem;
@@ -45,7 +45,7 @@ public class Activity_Main extends FragmentActivity {
         if (b == null) {
             // Create new fragment and transaction
             Fragment newFragment = new Fragment_Overview();
-            FragmentTransaction transaction = getFragmentManager().beginTransaction();
+            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
 
             // Replace whatever is in the fragment_container view with this
             // fragment,
@@ -65,8 +65,8 @@ public class Activity_Main extends FragmentActivity {
 
     @Override
     public void onBackPressed() {
-        if (getFragmentManager().getBackStackEntryCount() > 0) {
-            getFragmentManager().popBackStackImmediate();
+        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            getSupportFragmentManager().popBackStackImmediate();
         } else {
             finish();
         }
@@ -75,10 +75,10 @@ public class Activity_Main extends FragmentActivity {
     public boolean optionsItemSelected(final MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
-                getFragmentManager().popBackStackImmediate();
+                getSupportFragmentManager().popBackStackImmediate();
                 break;
             case R.id.action_settings:
-                getFragmentManager().beginTransaction()
+                getSupportFragmentManager().beginTransaction()
                         .replace(android.R.id.content, new Fragment_Settings()).addToBackStack(null)
                         .commit();
                 break;

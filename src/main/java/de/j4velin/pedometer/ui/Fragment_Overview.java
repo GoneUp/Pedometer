@@ -16,7 +16,6 @@
 package de.j4velin.pedometer.ui;
 
 import android.app.AlertDialog;
-import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -28,7 +27,8 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Pair;
+import android.support.v4.app.Fragment;
+import android.support.v4.view.ViewPager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -36,23 +36,24 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.RadioGroup;
+import android.widget.Spinner;
 import android.widget.TextView;
 
-import org.eazegraph.lib.charts.BarChart;
 import org.eazegraph.lib.charts.PieChart;
-import org.eazegraph.lib.models.BarModel;
 import org.eazegraph.lib.models.PieModel;
 
 import java.text.NumberFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 import de.j4velin.pedometer.BuildConfig;
 import de.j4velin.pedometer.Database;
 import de.j4velin.pedometer.R;
 import de.j4velin.pedometer.SensorListener;
+import de.j4velin.pedometer.TodayCountCache;
+import de.j4velin.pedometer.ui.stats.StatPagerAdapter;
+import de.j4velin.pedometer.ui.stats.StepChart;
 import de.j4velin.pedometer.util.API26Wrapper;
 import de.j4velin.pedometer.util.Logger;
 import de.j4velin.pedometer.util.Util;
@@ -62,10 +63,14 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
     private TextView stepsView, totalView, averageView;
     private PieModel sliceGoal, sliceCurrent;
     private PieChart pg;
+    private ViewPager chartPager;
+    private StatPagerAdapter chartAdapter;
+    private RadioGroup radioGroup;
+    private Spinner modeSpinner;
 
     private int todayOffset, total_start, goal, since_boot, total_days;
     public final static NumberFormat formatter = NumberFormat.getInstance(Locale.getDefault());
-    private boolean showSteps = true;
+    private boolean enableStatDialog;
 
     @Override
     public void onCreate(final Bundle savedInstanceState) {
@@ -95,25 +100,89 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
         // slice for the "missing" steps until reaching the goal
         sliceGoal = new PieModel("", Fragment_Settings.DEFAULT_GOAL, Color.parseColor("#CC0000"));
         pg.addPieSlice(sliceGoal);
+        pg.setDrawValueInPie(false);
+        pg.setUsePieRotation(true);
+        pg.startAnimation();
 
-        pg.setOnClickListener(new OnClickListener() {
+        enableStatDialog = Database.getInstance(getContext()).getDays() > 0;
+        View statsText = v.findViewById(R.id.averageandtotal);
+        statsText.setOnClickListener(new OnClickListener() {
             @Override
-            public void onClick(final View view) {
-                showSteps = !showSteps;
+            public void onClick(View v) {
+                if (enableStatDialog) {
+                    Dialog_Statistics.getDialog(getActivity(),  since_boot).show();
+                }
+            }
+        });
+
+        chartAdapter = new StatPagerAdapter(getChildFragmentManager());
+        chartAdapter.init(StepChart.TimeResolution.Day, StepChart.ViewMode.StepAvg,  getContext());
+
+        chartPager = v.findViewById(R.id.chartPager);
+        chartPager.setAdapter(chartAdapter);
+        chartPager.setCurrentItem(chartAdapter.getCount() - 1); //show latest data
+
+        radioGroup = v.findViewById(R.id.resolutionGroup);
+        radioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                switch (checkedId) {
+                    case R.id.btn_day:
+                        chartAdapter.setResolution(StepChart.TimeResolution.Day);
+                        break;
+                    case R.id.btn_week:
+                        chartAdapter.setResolution(StepChart.TimeResolution.Week);
+                        break;
+                    case R.id.btn_month:
+                        chartAdapter.setResolution(StepChart.TimeResolution.Month);
+                        break;
+                    case R.id.btn_year:
+                        chartAdapter.setResolution(StepChart.TimeResolution.Year);
+                        break;
+                }
+                chartPager.setCurrentItem(chartAdapter.getCount() - 1); //show latest data
+            }
+        });
+
+
+        modeSpinner = v.findViewById(R.id.box_mode);
+
+        modeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                switch (position) {
+                    case 0:
+                        chartAdapter.setMode(StepChart.ViewMode.StepAvg);
+                        break;
+                    case 1:
+                        chartAdapter.setMode(StepChart.ViewMode.StepTotal);
+                        break;
+                    case 2:
+                        chartAdapter.setMode(StepChart.ViewMode.DistanceAvg);
+                        break;
+                    case 3:
+                        chartAdapter.setMode(StepChart.ViewMode.DistanceTotal);
+                        break;
+                }
+                stepsDistanceChanged();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
                 stepsDistanceChanged();
             }
         });
 
-        pg.setDrawValueInPie(false);
-        pg.setUsePieRotation(true);
-        pg.startAnimation();
+
         return v;
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        getActivity().getActionBar().setDisplayHomeAsUpEnabled(false);
+        if (getActivity().getActionBar() != null) {
+            getActivity().getActionBar().setDisplayHomeAsUpEnabled(false);
+        }
 
         Database db = Database.getInstance(getActivity());
 
@@ -154,6 +223,7 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
         total_start = db.getTotalWithoutToday();
         total_days = db.getDays();
 
+        db.printAllEntries();
         db.close();
 
         stepsDistanceChanged();
@@ -164,7 +234,7 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
      * the pie graph as well as the pie and the bars graphs.
      */
     private void stepsDistanceChanged() {
-        if (showSteps) {
+        if (Util.isStepModeActive(chartAdapter.getMode())) {
             ((TextView) getView().findViewById(R.id.unit)).setText(getString(R.string.steps));
         } else {
             String unit = getActivity().getSharedPreferences("pedometer", Context.MODE_PRIVATE)
@@ -178,7 +248,8 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
         }
 
         updatePie();
-        updateBars();
+        chartAdapter.notifyDataSetChanged();
+        chartPager.setVisibility(chartAdapter.getCount() > 0 ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -248,6 +319,8 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
         if (BuildConfig.DEBUG) Logger.log("UI - update steps: " + since_boot);
         // todayOffset might still be Integer.MIN_VALUE on first start
         int steps_today = Math.max(todayOffset + since_boot, 0);
+        TodayCountCache.setTodayStepNo(steps_today);
+
         sliceCurrent.setValue(steps_today);
         if (goal - steps_today > 0) {
             // goal not reached yet
@@ -263,7 +336,7 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
             pg.addPieSlice(sliceCurrent);
         }
         pg.update();
-        if (showSteps) {
+        if (Util.isStepModeActive(chartAdapter.getMode())) {
             stepsView.setText(formatter.format(steps_today));
             totalView.setText(formatter.format(total_start + steps_today));
             averageView.setText(formatter.format((total_start + steps_today) / total_days));
@@ -286,64 +359,13 @@ public class Fragment_Overview extends Fragment implements SensorEventListener {
             totalView.setText(formatter.format(distance_total));
             averageView.setText(formatter.format(distance_total / total_days));
         }
+
     }
 
-    /**
-     * Updates the bar graph to show the steps/distance of the last week. Should
-     * be called when switching from step count to distance.
-     */
-    private void updateBars() {
-        SimpleDateFormat df = new SimpleDateFormat("E", Locale.getDefault());
-        BarChart barChart = (BarChart) getView().findViewById(R.id.bargraph);
-        if (barChart.getData().size() > 0) barChart.clearChart();
-        int steps;
-        float distance, stepsize = Fragment_Settings.DEFAULT_STEP_SIZE;
-        boolean stepsize_cm = true;
-        if (!showSteps) {
-            // load some more settings if distance is needed
-            SharedPreferences prefs =
-                    getActivity().getSharedPreferences("pedometer", Context.MODE_PRIVATE);
-            stepsize = prefs.getFloat("stepsize_value", Fragment_Settings.DEFAULT_STEP_SIZE);
-            stepsize_cm = prefs.getString("stepsize_unit", Fragment_Settings.DEFAULT_STEP_UNIT)
-                    .equals("cm");
-        }
-        barChart.setShowDecimal(!showSteps); // show decimal in distance view only
-        BarModel bm;
-        Database db = Database.getInstance(getActivity());
-        List<Pair<Long, Integer>> last = db.getLastEntries(8);
-        db.close();
-        for (int i = last.size() - 1; i > 0; i--) {
-            Pair<Long, Integer> current = last.get(i);
-            steps = current.second;
-            if (steps > 0) {
-                bm = new BarModel(df.format(new Date(current.first)), 0,
-                        steps > goal ? Color.parseColor("#99CC00") : Color.parseColor("#0099cc"));
-                if (showSteps) {
-                    bm.setValue(steps);
-                } else {
-                    distance = steps * stepsize;
-                    if (stepsize_cm) {
-                        distance /= 100000;
-                    } else {
-                        distance /= 5280;
-                    }
-                    distance = Math.round(distance * 1000) / 1000f; // 3 decimals
-                    bm.setValue(distance);
-                }
-                barChart.addBar(bm);
-            }
-        }
-        if (barChart.getData().size() > 0) {
-            barChart.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(final View v) {
-                    Dialog_Statistics.getDialog(getActivity(), since_boot).show();
-                }
-            });
-            barChart.startAnimation();
-        } else {
-            barChart.setVisibility(View.GONE);
-        }
-    }
+
+
+
+
+
 
 }

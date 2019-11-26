@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:eaze="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+
+    <de.j4velin.pedometer.ui.stats.StepChart
+        android:id="@+id/bargraph"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        eaze:egLegendHeight="30dp"
+        eaze:egLegendTextSize="10dp"
+        eaze:egShowValues="true"
+        android:layout_above="@id/datecontainer"/>
+
+
+    <LinearLayout
+        android:id="@+id/datecontainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_horizontal"
+        android:layout_alignParentBottom="true">
+
+        <TextView
+            android:id="@+id/dateText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+
+
+            android:text="01.01.2018 - 01.01.2018"
+
+            />
+    </LinearLayout>
+
+
+
+</RelativeLayout>

@@ -21,14 +21,18 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 import android.util.Pair;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import de.j4velin.pedometer.util.Logger;
+import de.j4velin.pedometer.util.TimeStepPair;
 import de.j4velin.pedometer.util.Util;
 
 public class Database extends SQLiteOpenHelper {
@@ -95,12 +99,12 @@ public class Database extends SQLiteOpenHelper {
 
     /**
      * Inserts a new entry in the database, if there is no entry for the given
-     * date yet. Steps should be the current number of steps and it's negative
+     * date yet. steps should be the current number of steps and it's negative
      * value will be used as offset for the new date. Also adds 'steps' steps to
      * the previous day, if there is an entry for that date.
      * <p/>
      * This method does nothing if there is already an entry for 'date' - use
-     * {@link #updateSteps} in this case.
+     * {@link #insertDayFromBackup(long, int)} in this case.
      * <p/>
      * To restore data from a backup, use {@link #insertDayFromBackup}
      *
@@ -256,23 +260,104 @@ public class Database extends SQLiteOpenHelper {
     /**
      * Gets the last num entries in descending order of date (newest first)
      *
-     * @param num the number of entries to get
+     *
      * @return a list of long,integer pair - the first being the date, the second the number of steps
      */
-    public List<Pair<Long, Integer>> getLastEntries(int num) {
+    public List<TimeStepPair> getDayEntries(final long start, final long end) {
         Cursor c = getReadableDatabase()
-                .query(DB_NAME, new String[]{"date", "steps"}, "date > 0", null, null, null,
-                        "date DESC", String.valueOf(num));
+                .query(DB_NAME, new String[]{"date, steps"},
+                        "date >= ? AND date <= ?",
+                        new String[]{String.valueOf(start), String.valueOf(end)},
+                        null,
+                        null,
+                        "date desc");
         int max = c.getCount();
-        List<Pair<Long, Integer>> result = new ArrayList<>(max);
+        List<TimeStepPair> result = new ArrayList<>(max);
         if (c.moveToFirst()) {
             do {
-                result.add(new Pair<>(c.getLong(0), c.getInt(1)));
+                result.add(new TimeStepPair(c.getLong(0), c.getInt(1)));
             } while (c.moveToNext());
         }
+        c.close();
         return result;
     }
 
+/*
+select min(date), AVG(steps), strftime('%W', date / 1000, 'unixepoch', 'localtime') WeekNo from steps
+where date >= 1546297200000 and date <= 1548889200000
+group by WeekNo
+order by date desc;
+ */
+
+    public List<TimeStepPair>  getWeekEntries(final long start, final long end, String function) {
+        Cursor c = getReadableDatabase()
+                .query(DB_NAME, new String[]{String.format("min(date), %s(steps), strftime('%%W', date / 1000, 'unixepoch', 'localtime') WeekNo", function)},
+                        "date >= ? AND date <= ?",
+                        new String[]{String.valueOf(start), String.valueOf(end)},
+                        "WeekNo",
+                        null,
+                        "date desc");
+        int max = c.getCount();
+        List<TimeStepPair> result = new ArrayList<>(max);
+        if (c.moveToFirst()) {
+            do {
+                result.add(new TimeStepPair(c.getLong(0), c.getInt(1)));
+            } while (c.moveToNext());
+        }
+        c.close();
+        return result;
+    }
+
+
+    /*
+    select min(date), AVG(steps), strftime('%m', date / 1000, 'unixepoch', 'localtime') MonthNo from steps
+    where date >= 1514761200000 and date <= 1546297200000
+    group by MonthNo
+    order by date desc;
+    */
+    public List<TimeStepPair>  getMonthEntries(final long start, final long end, String function) {
+        Cursor c = getReadableDatabase()
+                .query(DB_NAME, new String[]{String.format("min(date), %s(steps), strftime('%%m', date / 1000, 'unixepoch', 'localtime') MonthNo", function)},
+                        "date >= ? AND date <= ?",
+                        new String[]{String.valueOf(start), String.valueOf(end)},
+                        "MonthNo",
+                        null,
+                        "date desc");
+        int max = c.getCount();
+        List<TimeStepPair> result = new ArrayList<>(max);
+        if (c.moveToFirst()) {
+            do {
+                result.add(new TimeStepPair(c.getLong(0), c.getInt(1)));
+            } while (c.moveToNext());
+        }
+        c.close();
+        return result;
+    }
+
+    /*select min(date), AVG(steps), strftime('%Y', date / 1000, 'unixepoch', 'localtime') YearNo from steps
+where date != -1
+group by YearNo
+order by date desc;
+*/
+    public List<TimeStepPair>  getYearEntries(String function) {
+        Cursor c = getReadableDatabase()
+                .query(DB_NAME,
+                        new String[]{String.format("min(date), %s(steps), strftime('%%Y', date / 1000, 'unixepoch', 'localtime') YearNo", function)},
+                        "date != -1",
+                        null,
+                        "YearNo",
+                        null,
+                        "date desc");
+        int max = c.getCount();
+        List<TimeStepPair> result = new ArrayList<>(max);
+        if (c.moveToFirst()) {
+            do {
+                result.add(new TimeStepPair(c.getLong(0), c.getInt(1)));
+            } while (c.moveToNext());
+        }
+        c.close();
+        return result;
+    }
     /**
      * Get the number of steps taken between 'start' and 'end' date
      * <p/>
@@ -380,4 +465,26 @@ public class Database extends SQLiteOpenHelper {
         int re = getSteps(-1);
         return re == Integer.MIN_VALUE ? 0 : re;
     }
+
+
+    public long getStartDate() {
+        Cursor c = getReadableDatabase()
+                .query(DB_NAME, new String[]{"MIN(date)"}, "date > 1",
+                        null, null,
+                        null, null);
+        c.moveToFirst();
+        long re = c.getLong(0);
+        c.close();
+        return re;
+    }
+
+
+    public void printAllEntries() {
+        List<TimeStepPair> dayEntries = getDayEntries(1, Long.MAX_VALUE);
+        DateFormat df = SimpleDateFormat.getDateTimeInstance();
+        for (TimeStepPair day : dayEntries) {
+            Log.d("Ped", "Day " + df.format(new Date(day.first)) + " steps " + day.second);
+        }
+    }
+
 }
